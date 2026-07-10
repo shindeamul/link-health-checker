@@ -1,0 +1,13 @@
+{
+  "name": "url-health-checker",
+  "version": "1.0.0",
+  "description": "Extract every URL from JSON/input and health-check images, videos, audio and links.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

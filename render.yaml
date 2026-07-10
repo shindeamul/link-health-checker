@@ -1,0 +1,12 @@
+# Render Blueprint — deploys the full app (static page + real-status backend).
+# Push this repo to GitHub, then in Render: New → Blueprint → pick the repo.
+services:
+  - type: web
+    name: url-health-checker
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 3000

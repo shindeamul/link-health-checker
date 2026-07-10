@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URL Health Checker</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #1a1d24;
+    --panel2: #21252e;
+    --border: #2c313c;
+    --text: #e6e9ef;
+    --muted: #8b93a3;
+    --accent: #4f8cff;
+    --ok: #2ecc71;
+    --broken: #ff5a5a;
+    --pending: #f0b429;
+    --unknown: #8b93a3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  h1 { margin: 0; font-size: 20px; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  .inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 720px) { .inputs { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .card h3 { margin: 0 0 10px; font-size: 14px; }
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    resize: vertical;
+  }
+  input[type="text"] {
+    width: 100%;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px;
+    font-size: 13px;
+  }
+  input[type="file"] { color: var(--muted); font-size: 13px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: var(--panel2); border: 1px solid var(--border); color: var(--text); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  label.opt { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+  .summary { display: flex; gap: 12px; flex-wrap: wrap; margin: 20px 0; }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 18px;
+    min-width: 90px;
+  }
+  .stat .n { font-size: 24px; font-weight: 700; }
+  .stat .l { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat.ok .n { color: var(--ok); }
+  .stat.broken .n { color: var(--broken); }
+  .stat.pending .n { color: var(--pending); }
+  .bar { height: 8px; background: var(--panel2); border-radius: 4px; overflow: hidden; display: flex; margin: 8px 0 16px; }
+  .bar .seg { height: 100%; }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chip {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+  td.url { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; max-width: 480px; }
+  td.url a { color: var(--accent); text-decoration: none; }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge.ok { background: rgba(46,204,113,0.15); color: var(--ok); }
+  .badge.broken { background: rgba(255,90,90,0.15); color: var(--broken); }
+  .badge.pending { background: rgba(240,180,41,0.15); color: var(--pending); }
+  .badge.unknown { background: rgba(139,147,163,0.15); color: var(--unknown); }
+  .type-tag { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+  thumb, .thumb { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; background: var(--panel2); display: block; }
+  .thumb-ph { width: 44px; height: 44px; border-radius: 6px; background: var(--panel2); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .empty { text-align: center; color: var(--muted); padding: 40px; }
+  .note { font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🔗 URL Health Checker</h1>
+  <div class="sub">Paste JSON, upload a file, or enter a single URL. Extracts every image / video / audio / link and checks if it's alive or broken.</div>
+</header>
+<main>
+  <div class="inputs">
+    <div class="card">
+      <h3>Paste JSON or drop a file</h3>
+      <textarea id="jsonInput" placeholder='{ "data": { ... } }  — paste any JSON here'></textarea>
+      <div class="row">
+        <input type="file" id="fileInput" accept=".json,application/json,image/*,video/*,audio/*">
+      </div>
+    </div>
+    <div class="card">
+      <h3>Or check a single URL / list</h3>
+      <input type="text" id="urlInput" placeholder="https://example.com/image.jpg">
+      <div class="row">
+        <textarea id="urlList" placeholder="One URL per line (optional)" style="min-height:70px"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="row" style="margin-bottom:16px">
+    <button id="runBtn">Run Health Check</button>
+    <button id="clearBtn" class="secondary">Clear</button>
+    <button id="exportBtn" class="secondary" disabled>Export CSV</button>
+    <label class="opt"><input type="checkbox" id="serverMode"> Use server (real status codes)</label>
+    <span class="sub" id="foundCount"></span>
+  </div>
+
+  <div class="note" id="modeNote">
+    Browser mode: media assets (image/video/audio) are checked by actually loading them — reliable <b>OK</b>/<b>Broken</b> detection with no setup.
+    Other links can't return a real status code from a browser (CORS). For real HTTP codes (200/404) on every URL, run the bundled server (<code>node server.js</code>) and tick "Use server".
+  </div>
+
+  <div id="results" style="display:none">
+    <div class="summary" id="summary"></div>
+    <div class="bar" id="bar"></div>
+    <div class="toolbar">
+      <div class="filters" id="filters"></div>
+      <span class="sub" id="progress"></span>
+    </div>
+    <div class="card" style="padding:0; overflow-x:auto">
+      <table>
+        <thead>
+          <tr><th></th><th>URL</th><th>Type</th><th>Status</th><th>Detail</th></tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="empty" id="emptyState">No results yet. Provide some input and hit <b>Run Health Check</b>.</div>
+</main>
+
+<script>
+const CONCURRENCY = 8;
+const TIMEOUT_MS = 15000;
+
+const el = id => document.getElementById(id);
+let rows = [];        // {url, type, status, detail}
+let activeFilter = 'all';
+
+// ---- URL extraction ----------------------------------------------------
+const URL_RE = /https?:\/\/[^\s"'<>\\)]+/gi;
+
+function extractFromValue(val, out) {
+  if (val == null) return;
+  if (typeof val === 'string') {
+    const m = val.match(URL_RE);
+    if (m) m.forEach(u => out.add(u));
+  } else if (Array.isArray(val)) {
+    val.forEach(v => extractFromValue(v, out));
+  } else if (typeof val === 'object') {
+    Object.values(val).forEach(v => extractFromValue(v, out));
+  }
+}
+
+function collectUrls() {
+  const out = new Set();
+  // JSON textarea
+  const raw = el('jsonInput').value.trim();
+  if (raw) {
+    try {
+      extractFromValue(JSON.parse(raw), out);
+    } catch (e) {
+      // not valid JSON — still scrape any URLs from the raw text
+      const m = raw.match(URL_RE);
+      if (m) m.forEach(u => out.add(u));
+    }
+  }
+  // single URL
+  const single = el('urlInput').value.trim();
+  if (single) (single.match(URL_RE) || [single].filter(s => /^https?:/.test(s))).forEach(u => out.add(u));
+  // url list
+  el('urlList').value.split(/\n+/).map(s => s.trim()).filter(Boolean).forEach(u => {
+    (u.match(URL_RE) || (/^https?:/.test(u) ? [u] : [])).forEach(x => out.add(x));
+  });
+  return [...out];
+}
+
+// ---- type classification ----------------------------------------------
+function typeOf(url) {
+  const clean = url.split('?')[0].split('#')[0].toLowerCase();
+  if (/\.(jpg|jpeg|png|gif|webp|svg|bmp|avif|ico)$/.test(clean)) return 'image';
+  if (/\.(mp4|webm|mov|mkv|avi|m4v|ogv)$/.test(clean)) return 'video';
+  if (/\.(mp3|wav|ogg|m4a|aac|flac)$/.test(clean)) return 'audio';
+  return 'link';
+}
+
+// ---- checkers ----------------------------------------------------------
+function checkMedia(url, type) {
+  return new Promise(resolve => {
+    let done = false;
+    const start = performance.now();
+    const finish = (status, detail) => {
+      if (done) return; done = true;
+      resolve({ status, detail: detail || `${Math.round(performance.now() - start)}ms` });
+    };
+    const timer = setTimeout(() => finish('broken', 'timeout'), TIMEOUT_MS);
+    if (type === 'image') {
+      const img = new Image();
+      img.onload = () => { clearTimeout(timer); finish('ok', `${img.naturalWidth}×${img.naturalHeight}`); };
+      img.onerror = () => { clearTimeout(timer); finish('broken', 'load failed'); };
+      img.src = url + (url.includes('?') ? '&' : '?') + '_hc=' + Date.now();
+    } else {
+      const media = document.createElement(type === 'video' ? 'video' : 'audio');
+      media.preload = 'metadata';
+      media.muted = true;
+      media.onloadedmetadata = () => { clearTimeout(timer); finish('ok', `${Math.round(media.duration || 0)}s`); };
+      media.onerror = () => { clearTimeout(timer); finish('broken', 'load failed'); };
+      media.src = url;
+    }
+  });
+}
+
+async function checkLinkBrowser(url) {
+  // Cross-origin: can't read status. Try no-cors just to see if it resolves.
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    await fetch(url, { method: 'GET', mode: 'no-cors', signal: ctrl.signal });
+    clearTimeout(t);
+    return { status: 'unknown', detail: 'reachable (CORS: no status)' };
+  } catch (e) {
+    return { status: 'broken', detail: e.name === 'AbortError' ? 'timeout' : 'unreachable' };
+  }
+}
+
+async function checkViaServer(url) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS + 2000);
+    const r = await fetch('/check?url=' + encodeURIComponent(url), { signal: ctrl.signal });
+    clearTimeout(t);
+    const j = await r.json();
+    if (j.error) return { status: 'broken', detail: j.error };
+    const ok = j.status >= 200 && j.status < 400;
+    return { status: ok ? 'ok' : 'broken', detail: `HTTP ${j.status}${j.ms ? ' · ' + j.ms + 'ms' : ''}` };
+  } catch (e) {
+    return { status: 'broken', detail: 'server unreachable' };
+  }
+}
+
+// ---- runner ------------------------------------------------------------
+let running = false;
+async function run() {
+  if (running) return;
+  const urls = collectUrls();
+  if (!urls.length) { alert('No URLs found in the input.'); return; }
+  running = true;
+  el('runBtn').disabled = true;
+  const useServer = el('serverMode').checked;
+
+  rows = urls.map(url => ({ url, type: typeOf(url), status: 'pending', detail: '' }));
+  el('emptyState').style.display = 'none';
+  el('results').style.display = 'block';
+  el('foundCount').textContent = `${urls.length} URLs found`;
+  render();
+
+  let idx = 0, completed = 0;
+  async function worker() {
+    while (idx < rows.length) {
+      const i = idx++;
+      const row = rows[i];
+      let res;
+      if (useServer) res = await checkViaServer(row.url);
+      else if (row.type === 'link') res = await checkLinkBrowser(row.url);
+      else res = await checkMedia(row.url, row.type);
+      row.status = res.status;
+      row.detail = res.detail;
+      completed++;
+      el('progress').textContent = `${completed} / ${rows.length} checked`;
+      render();
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, rows.length) }, worker));
+
+  running = false;
+  el('runBtn').disabled = false;
+  el('exportBtn').disabled = false;
+}
+
+// ---- rendering ---------------------------------------------------------
+function render() {
+  // summary
+  const c = { ok: 0, broken: 0, pending: 0, unknown: 0 };
+  rows.forEach(r => c[r.status]++);
+  el('summary').innerHTML = `
+    <div class="stat"><div class="n">${rows.length}</div><div class="l">Total</div></div>
+    <div class="stat ok"><div class="n">${c.ok}</div><div class="l">OK</div></div>
+    <div class="stat broken"><div class="n">${c.broken}</div><div class="l">Broken</div></div>
+    <div class="stat pending"><div class="n">${c.pending}</div><div class="l">Checking</div></div>
+    ${c.unknown ? `<div class="stat"><div class="n">${c.unknown}</div><div class="l">Unknown</div></div>` : ''}`;
+  const tot = rows.length || 1;
+  el('bar').innerHTML = `
+    <div class="seg" style="width:${c.ok/tot*100}%;background:var(--ok)"></div>
+    <div class="seg" style="width:${c.broken/tot*100}%;background:var(--broken)"></div>
+    <div class="seg" style="width:${c.unknown/tot*100}%;background:var(--unknown)"></div>
+    <div class="seg" style="width:${c.pending/tot*100}%;background:var(--pending)"></div>`;
+
+  // filters
+  const filters = [['all','All'],['ok','OK'],['broken','Broken'],['unknown','Unknown'],['image','Images'],['video','Videos'],['audio','Audio'],['link','Links']];
+  el('filters').innerHTML = filters.map(([k,label]) =>
+    `<span class="chip ${activeFilter===k?'active':''}" data-f="${k}">${label}</span>`).join('');
+  el('filters').querySelectorAll('.chip').forEach(ch => ch.onclick = () => { activeFilter = ch.dataset.f; render(); });
+
+  // rows
+  const shown = rows.filter(r => activeFilter === 'all' || r.status === activeFilter || r.type === activeFilter);
+  const icons = { image: '🖼️', video: '🎬', audio: '🎵', link: '🔗' };
+  el('tbody').innerHTML = shown.map(r => {
+    const thumb = r.type === 'image'
+      ? `<img class="thumb" src="${escapeAttr(r.url)}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-ph',textContent:'🖼️'}))">`
+      : `<div class="thumb-ph">${icons[r.type]}</div>`;
+    return `<tr>
+      <td>${thumb}</td>
+      <td class="url"><a href="${escapeAttr(r.url)}" target="_blank" rel="noopener">${escapeHtml(r.url)}</a></td>
+      <td><span class="type-tag">${r.type}</span></td>
+      <td><span class="badge ${r.status}">${r.status.toUpperCase()}</span></td>
+      <td class="sub">${escapeHtml(r.detail || '')}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="5" class="empty">No URLs match this filter.</td></tr>`;
+}
+
+function escapeHtml(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function escapeAttr(s){ return s.replace(/"/g,'&quot;'); }
+
+// ---- export ------------------------------------------------------------
+function exportCsv() {
+  const header = 'url,type,status,detail\n';
+  const body = rows.map(r => [r.url, r.type, r.status, r.detail].map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([header + body], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'url-health-report.csv';
+  a.click();
+}
+
+// ---- file input --------------------------------------------------------
+el('fileInput').onchange = e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  if (f.type.startsWith('image') || f.type.startsWith('video') || f.type.startsWith('audio')) {
+    el('urlInput').value = URL.createObjectURL(f);
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => { el('jsonInput').value = reader.result; };
+  reader.readAsText(f);
+};
+
+el('runBtn').onclick = run;
+el('exportBtn').onclick = exportCsv;
+el('clearBtn').onclick = () => {
+  el('jsonInput').value = ''; el('urlInput').value = ''; el('urlList').value = '';
+  el('fileInput').value = ''; rows = [];
+  el('results').style.display = 'none'; el('emptyState').style.display = 'block';
+  el('exportBtn').disabled = true; el('foundCount').textContent = '';
+};
+el('serverMode').onchange = () => {
+  el('modeNote').innerHTML = el('serverMode').checked
+    ? 'Server mode: every URL is checked with a real HTTP request — returns actual status codes (200/404/etc). Requires <code>node server.js</code> running.'
+    : 'Browser mode: media assets (image/video/audio) are checked by actually loading them — reliable <b>OK</b>/<b>Broken</b> detection with no setup. Other links can\'t return a real status code from a browser (CORS).';
+};
+</script>
+</body>
+</html>

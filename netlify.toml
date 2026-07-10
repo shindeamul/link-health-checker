@@ -1,0 +1,11 @@
+# Netlify config: serve index.html statically + run /check as a serverless function.
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+# The page calls /check?url=... — redirect that to the serverless function
+# so no frontend change is needed.
+[[redirects]]
+  from = "/check"
+  to = "/.netlify/functions/check"
+  status = 200
